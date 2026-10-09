@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#10192f">
+<title>Coin Rush</title>
+<style>
+:root{color-scheme:dark}*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;font-family:system-ui,-apple-system,sans-serif;background:#10192f;color:#fff;touch-action:manipulation}
+body{display:flex;flex-direction:column}.top{display:flex;justify-content:space-between;align-items:center;padding:14px 18px 8px}.brand{font-weight:1000;letter-spacing:1px;color:#facc15;font-size:23px}.sub{font-size:11px;color:#b7c4df}.stats{display:flex;gap:8px;padding:6px 12px}.stat{flex:1;background:#1e293b;border-radius:13px;padding:9px 12px}.label{font-size:11px;color:#aebbd5}.num{font-size:22px;font-weight:850;color:#facc15}.arena{position:relative;flex:1;min-height:0;margin:6px 12px 10px;border-radius:22px;overflow:hidden;background:radial-gradient(ellipse at 50% 35%,#243e70,#142342 65%,#111a31);border:1px solid #2b416a}
+canvas{display:block;width:100%;height:100%;touch-action:manipulation}.overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px;background:#0d1730bb}.panel{max-width:300px}.panel h1{font-size:29px;margin:0 0 8px;color:#facc15}.panel p{line-height:1.5;color:#d1daeb;font-size:14px}.btn{border:0;border-radius:14px;background:#facc15;color:#172033;font-size:16px;font-weight:900;padding:14px 24px;min-width:180px;box-shadow:0 4px 0 #bb8d12}.btn:active{transform:translateY(2px);box-shadow:0 2px 0 #bb8d12}.bottom{padding:0 16px 12px;text-align:center;color:#91a3c5;font-size:11px}.hidden{display:none!important}.hint{position:absolute;top:12px;left:0;right:0;text-align:center;color:#d6e0f6;font-size:12px;pointer-events:none;text-shadow:0 1px 3px #000}
+</style>
+</head>
+<body>
+<header class="top"><div><div class="brand">🪙 COIN RUSH</div><div class="sub">Grab the gold. Dodge the bombs.</div></div><div style="text-align:right"><div class="sub">BEST</div><div id="best" style="font-size:20px;font-weight:900">0</div></div></header>
+<div class="stats"><div class="stat"><div class="label">SCORE</div><div id="score" class="num">0</div></div><div class="stat"><div class="label">VIRTUAL COINS</div><div id="wallet" class="num">0</div></div><div class="stat"><div class="label">TIME</div><div id="time" class="num">30</div></div></div>
+<main class="arena" id="arena"><canvas id="game"></canvas><div class="hint" id="hint">Tap coins to collect • Avoid bombs</div>
+<div class="overlay" id="overlay"><div class="panel"><h1>COIN RUSH</h1><p>Collect as many gold coins as you can in 30 seconds. Watch out for bombs! Coins are virtual game points and have no cash value.</p><button class="btn" id="start">▶ PLAY NOW</button></div></div>
+</main>
+<footer class="bottom">Play fair • Virtual coins only • No cash payouts</footer>
+<script>
+(()=>{
+const canvas=document.getElementById('game'),ctx=canvas.getContext('2d'),arena=document.getElementById('arena');
+const scoreEl=document.getElementById('score'),walletEl=document.getElementById('wallet'),timeEl=document.getElementById('time'),bestEl=document.getElementById('best'),overlay=document.getElementById('overlay'),hint=document.getElementById('hint');
+let W=0,H=0,items=[],score=0,wallet=0,left=30,running=false,last=0,spawn=0,raf=0;
+let best=Number(localStorage.getItem('coinrush_best')||0);bestEl.textContent=best;
+function resize(){const r=arena.getBoundingClientRect(),d=Math.min(devicePixelRatio||1,2);W=r.width;H=r.height;canvas.width=Math.floor(W*d);canvas.height=Math.floor(H*d);ctx.setTransform(d,0,0,d,0,0)}
+new ResizeObserver(resize).observe(arena);resize();
+function spawnItem(){const bomb=Math.random()<.23;const rad=bomb?19:17;items.push({x:rad+Math.random()*(W-2*rad),y:H+rad,r:rad,vy:-(75+Math.random()*95),type:bomb?'bomb':'coin',spin:Math.random()*6.28,life:5})}
+function drawItem(o){ctx.save();ctx.translate(o.x,o.y);if(o.type==='coin'){ctx.rotate(Math.sin(o.spin)*.22);ctx.shadowColor='#facc15';ctx.shadowBlur=16;const g=ctx.createRadialGradient(-6,-8,2,0,0,o.r);g.addColorStop(0,'#fff6a5');g.addColorStop(.45,'#facc15');g.addColorStop(1,'#d97706');ctx.fillStyle=g;ctx.beginPath();ctx.arc(0,0,o.r,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;ctx.strokeStyle='#fff1a8';ctx.lineWidth=2;ctx.stroke();ctx.fillStyle='#9a5b00';ctx.font='bold 19px system-ui';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('$',0,1)}else{ctx.shadowColor='#fb7185';ctx.shadowBlur=10;ctx.fillStyle='#20283b';ctx.beginPath();ctx.arc(0,0,o.r,0,Math.PI*2);ctx.fill();ctx.strokeStyle='#fb7185';ctx.lineWidth=2;ctx.stroke();ctx.shadowBlur=0;ctx.strokeStyle='#fca5a5';ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(-8,-8);ctx.lineTo(8,8);ctx.moveTo(8,-8);ctx.lineTo(-8,8);ctx.stroke()}ctx.restore()}
+function frame(t){if(!running)return;const dt=Math.min((t-last)/1000||0,.04);last=t;left-=dt;if(left<=0){left=0;endGame();return}spawn-=dt;if(spawn<=0){spawnItem();spawn=Math.max(.24,.72-score*.004)}items=items.filter(o=>{o.y+=o.vy*dt;o.spin+=dt*3;o.life-=dt;return o.y>-40&&o.life>0});ctx.clearRect(0,0,W,H);for(const o of items)drawItem(o);timeEl.textContent=Math.ceil(left);raf=requestAnimationFrame(frame)}
+function start(){cancelAnimationFrame(raf);score=0;wallet=Number(localStorage.getItem('coinrush_wallet')||0);left=30;items=[];spawn=.1;running=true;scoreEl.textContent='0';walletEl.textContent=wallet;timeEl.textContent='30';overlay.classList.add('hidden');hint.classList.remove('hidden');last=performance.now();raf=requestAnimationFrame(frame)}
+function endGame(){running=false;cancelAnimationFrame(raf);if(score>best){best=score;localStorage.setItem('coinrush_best',best);bestEl.textContent=best}overlay.innerHTML=`<div class="panel"><h1>TIME'S UP!</h1><p>You collected <b style="color:#facc15">${score}</b> coins this round.<br>Your best score is <b>${best}</b>.<br><br>Virtual wallet: ${wallet} coins<br><small>Coins have no cash value.</small></p><button class="btn" id="again">↻ PLAY AGAIN</button></div>`;overlay.classList.remove('hidden');document.getElementById('again').addEventListener('click',start);hint.classList.add('hidden')}
+function tap(e){if(!running)return;const r=canvas.getBoundingClientRect(),x=e.clientX-r.left,y=e.clientY-r.top;let found=-1;for(let i=items.length-1;i>=0;i--){const o=items[i];if(Math.hypot(o.x-x,o.y-y)<o.r+14){found=i;break}}if(found<0)return;const o=items.splice(found,1)[0];if(o.type==='bomb'){left=Math.max(0,left-3);timeEl.textContent=Math.ceil(left);arena.animate([{transform:'translateX(-4px)'},{transform:'translateX(4px)'},{transform:'translateX(0)'}],{duration:160});if(left<=0)endGame()}else{score++;wallet++;scoreEl.textContent=score;walletEl.textContent=wallet;localStorage.setItem('coinrush_wallet',wallet);const pop=document.createElement('div');pop.textContent='+1';pop.style.cssText=`position:absolute;left:${x}px;top:${y}px;color:#facc15;font-weight:1000;font-size:20px;pointer-events:none;animation:pop .45s ease-out forwards`;arena.appendChild(pop);setTimeout(()=>pop.remove(),500)}}
+canvas.addEventListener('pointerdown',tap);document.getElementById('start').addEventListener('click',start);
+const style=document.createElement('style');style.textContent='@keyframes pop{to{transform:translateY(-30px);opacity:0}}';document.head.appendChild(style);
+})();
+</script>
+</body>
+</html>
